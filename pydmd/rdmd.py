@@ -7,33 +7,35 @@ Randomized dynamic mode decomposition. SIAM Journal on Applied Dynamical
 Systems, 18, 2019.
 """
 
-import numpy as np
-
 from .cdmd import CDMD
-from .utils import compute_rank
+from .utils import compute_rqb
 
 
 class RDMD(CDMD):
     """
     Randomized Dynamic Mode Decomposition
 
-    :param rand_mat: The random test matrix that will be used when executing
+    :param test_matrix: The random test matrix that will be used when executing
         the Randomized QB Decomposition. If not provided, the `svd_rank` and
         `oversampling` parameters will be used to compute the random matrix.
-    :type rand_mat: numpy.ndarray
-    :param oversampling: Number of additional samples (beyond the desired rank)
-        to use when computing the random test matrix. Note that values {5,10}
-        tend to be sufficient.
+    :type test_matrix: numpy.ndarray
+    :param seed: Seed used to initialize the random generator when computing
+        random test matrices.
+    :type seed: int
+    :param oversampling: Number of additional samples (beyond the target rank)
+        to use when computing the random test matrix. Note that values in the
+        range [5, 10] tend to be sufficient.
     :type oversampling: int
     :param power_iters: Number of power iterations to perform when executing
-        the Randomized QB Decomposition. Note that values {1,2} often lead to
-        considerable improvements.
+        the Randomized QB Decomposition. Note that as many as 1 to 2 power
+        iterations often lead to considerable improvements.
     :type power_iters: int
     """
 
     def __init__(
         self,
-        rand_mat=None,
+        test_matrix=None,
+        seed=None,
         oversampling=10,
         power_iters=2,
         svd_rank=0,
@@ -57,7 +59,8 @@ class RDMD(CDMD):
         self._svd_rank = svd_rank
         self._oversampling = oversampling
         self._power_iters = power_iters
-        self._rand_mat = rand_mat
+        self._test_matrix = test_matrix
+        self._seed = seed
 
     def _compress_snapshots(self):
         """
@@ -68,28 +71,15 @@ class RDMD(CDMD):
         :return: the compressed snapshots
         :rtype: numpy.ndarray
         """
-        # Define the random test matrix if not provided.
-        if self._rand_mat is None:
-            m = self.snapshots.shape[-1]
-            r = compute_rank(self.snapshots, self._svd_rank)
-            self._rand_mat = np.random.randn(m, r + self._oversampling)
-
-        # Compute sampling matrix.
-        Y = self.snapshots.dot(self._rand_mat)
-
-        # Perform power iterations.
-        for _ in range(self._power_iters):
-            Q = np.linalg.qr(Y)[0]
-            Z = np.linalg.qr(self.snapshots.conj().T.dot(Q))[0]
-            Y = self.snapshots.dot(Z)
-
-        # Orthonormalize the sampling matrix.
-        Q = np.linalg.qr(Y)[0]
-
-        # Project the snapshot matrix onto the smaller space.
-        B = Q.conj().T.dot(self.snapshots)
-
-        # Save the compression matrix.
+        Q, B, test_matrix = compute_rqb(
+            self.snapshots,
+            self._svd_rank,
+            self._oversampling,
+            self._power_iters,
+            self._test_matrix,
+            self._seed,
+        )
         self._compression_matrix = Q.conj().T
+        self._test_matrix = test_matrix
 
         return B

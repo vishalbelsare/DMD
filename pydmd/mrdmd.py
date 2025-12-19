@@ -5,6 +5,7 @@ Reference:
 - Kutz, J. Nathan, Xing Fu, and Steven L. Brunton. Multiresolution Dynamic Mode
 Decomposition. SIAM Journal on Applied Dynamical Systems 15.2 (2016): 713-735.
 """
+
 from copy import deepcopy
 from functools import partial
 
@@ -383,6 +384,26 @@ Expected one item per level, got {} out of {} levels.""".format(
         leaves = self.dmd_tree.index_leaves(level) if node is None else [node]
         return np.concatenate(
             [self.dmd_tree[level, leaf].eigs for leaf in leaves]
+        )
+
+    def partial_amplitudes(self, level, node=None):
+        """
+        Return the amplitudes of the specific `level` and of the specific
+        `node`; if `node` is not specified, the method returns the amplitudes
+        of the given `level` (all the nodes).
+
+        :param int level: the index of the level from where the amplitudes are
+            extracted.
+        :param int node: the index of the node from where the amplitudes are
+            extracted; if None, the amplitudes are extracted from all the
+            nodes of the given level. Default is None.
+
+        :return: the selected eigs
+        :rtype: numpy.ndarray
+        """
+        leaves = self.dmd_tree.index_leaves(level) if node is None else [node]
+        return np.concatenate(
+            [self.dmd_tree[level, leaf].amplitudes for leaf in leaves]
         )
 
     def partial_reconstructed_data(self, level, node=None):

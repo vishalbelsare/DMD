@@ -1,8 +1,9 @@
 """
 Module for snapshots normalization.
 """
-import warnings
+
 import logging
+import warnings
 
 import numpy as np
 

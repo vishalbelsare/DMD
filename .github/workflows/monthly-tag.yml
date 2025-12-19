@@ -11,13 +11,13 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4.5.0
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -34,18 +34,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.NDEMO_PAT_TOKEN }}
 
       - name: Create and push the tag
         run: |
-          python utils/mathlab_versioning.py set --only-date "post$(date +%y%m)"
-          cat pydmd/meta.py
-          VERS=$(python utils/mathlab_versioning.py get)
+          # CalVer, e.g. 2024.07.19
+          VERS=$(date +%Y.%m.%d)
           git config --global user.name 'Monthly Tag bot'
           git config --global user.email 'mtbot@noreply.github.com'
-          git add pydmd/meta.py
-          git commit -m "monthly version $VERS"
-          git tag -a "v$VERS" -m "Monthly version $VERS"
-          git push origin "v$VERS"
+          git tag "$VERS" -a -m "Monthly version $VERS"
+          git push origin "$VERS"

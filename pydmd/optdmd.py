@@ -8,13 +8,14 @@ to dmd.
     solution in polynomial time. arXiv:1610.02962. 2016.
 
 """
+
 import numpy as np
 from scipy.linalg import eig
 
 from .dmdbase import DMDBase
 from .dmdoperator import DMDOperator
-from .utils import compute_svd, compute_tlsq
 from .snapshots import Snapshots
+from .utils import compute_svd, compute_tlsq
 
 
 def pinv_diag(x):

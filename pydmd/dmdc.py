@@ -5,6 +5,7 @@ Reference:
 - Proctor, J.L., Brunton, S.L. and Kutz, J.N., 2016. Dynamic mode decomposition
 with control. SIAM Journal on Applied Dynamical Systems, 15(1), pp.142-161.
 """
+
 import numpy as np
 
 from .dmdbase import DMDBase
@@ -190,9 +191,14 @@ class DMDc(DMDBase):
         equal than `svd_rank`. For the possible values please refer to the
         `svd_rank` parameter description above.
     :type svd_rank_omega: int or float
+    :param lag: the time lag for the snapshots. Used in fit method to generate
+        X and Y.
+    :type lag: int
     """
 
-    def __init__(self, svd_rank=0, tlsq_rank=0, opt=False, svd_rank_omega=-1):
+    def __init__(
+        self, svd_rank=0, tlsq_rank=0, opt=False, svd_rank_omega=-1, lag=1
+    ):
         # we're going to initialize Atilde when we know if B is known
         self._Atilde = None
         # remember the arguments for when we'll need them
@@ -209,6 +215,7 @@ class DMDc(DMDBase):
         self._snapshots_holder = None
         self._controlin = None
         self._basis = None
+        self._lag = lag
 
         self._modes_activation_bitmask_proxy = None
 
@@ -254,7 +261,7 @@ class DMDc(DMDBase):
             else self._controlin
         )
 
-        if controlin.shape[-1] != self.dynamics.shape[-1] - 1:
+        if controlin.shape[-1] != self.dynamics.shape[-1] - self._lag:
             raise RuntimeError(
                 "The number of control inputs and the number of snapshots to "
                 "reconstruct has to be the same"
@@ -263,15 +270,15 @@ class DMDc(DMDBase):
         eigs = np.power(
             self.eigs, self.dmd_time["dt"] // self.original_time["dt"]
         )
-        A = np.linalg.multi_dot(
-            [self.modes, np.diag(eigs), np.linalg.pinv(self.modes)]
-        )
 
-        data = [self.snapshots[:, 0]]
+        pinv_modes = np.linalg.pinv(self.modes)
+        data = [self.snapshots[:, i] for i in range(self._lag)]
         expected_shape = data[0].shape
 
         for i, u in enumerate(controlin.T):
-            arr = A.dot(data[i]) + self._B.dot(u)
+            arr = np.linalg.multi_dot(
+                [self.modes, np.diag(eigs), pinv_modes, data[i]]
+            ) + self._B.dot(u)
             if arr.shape != expected_shape:
                 raise ValueError(
                     f"Invalid shape: expected {expected_shape}, got {arr.shape}"
@@ -297,13 +304,16 @@ class DMDc(DMDBase):
         :type B: numpy.ndarray or iterable
         """
         self._reset()
-
-        self._snapshots_holder = Snapshots(X)
         self._controlin = np.atleast_2d(np.asarray(I))
 
-        n_samples = self.snapshots.shape[1]
-        X = self.snapshots[:, :-1]
-        Y = self.snapshots[:, 1:]
+        self._snapshots_holder = Snapshots(X)
+        n_samples = self.snapshots.shape[-1]
+
+        if self._lag < 1:
+            raise ValueError("Time lag must be positive.")
+
+        X = self.snapshots[:, : -self._lag]
+        Y = self.snapshots[:, self._lag :]
 
         self._set_initial_time_dictionary(
             {"t0": 0, "tend": n_samples - 1, "dt": 1}
